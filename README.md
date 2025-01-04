@@ -28,9 +28,9 @@ busted
 Or if you want to run a single test file:
 
 ```bash
-luarocks test spec/path_to_file.lua --local
+luarocks test tests/path_to_file.lua --local
 # or
-busted spec/path_to_file.lua
+busted tests/path_to_file.lua
 ```
 
 If you see an error like `module 'busted.runner' not found`:
