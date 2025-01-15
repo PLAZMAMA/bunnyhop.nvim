@@ -4,10 +4,8 @@ local M = {}
 ---Gets the available models to use.
 ---@param config bhop.config User config. Used to get the api_key for now, mabye more things later.
 ---@param callback function Function that gets called after the request is made.
----@return string[]
 function M.get_models(config, callback) --luacheck: no unused args
-    callback()
-    return { "Qwen/Qwen2.5-Coder-32B-Instruct" }
+    callback({ "Qwen/Qwen2.5-Coder-32B-Instruct" })
 end
 
 ---Completes the given prompt.
