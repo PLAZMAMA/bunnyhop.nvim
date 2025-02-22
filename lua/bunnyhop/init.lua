@@ -1,21 +1,26 @@
 local bhop_log = require("bunnyhop.log")
-local bhop_pred = require("bunnyhop.prediction")
-local bhop_adapter = {
+local bhop_pred = require("bunnyhop.prediction") -- TODO: rename to bhop_prediction to keep naming consistancy with the whole project
+local bhop_context = require("bunnyhop.context")
+
+local _bhop_adapter = {
     process_api_key = function(api_key, callback) end, --luacheck: no unused args
     get_models = function(config, callback) end, --luacheck: no unused args
     complete = function(prompt, config, callback) end, --luacheck: no unused args
 }
 
-local globals = {
-    DEFAULT_PREVIOUS_WIN_ID = -1,
-    DEFAULT_ACTION_COUNTER = 0,
-}
+---@type table<string, bhop.UndoEntry[]>
+local _editlists = {}
+
 ---@type number
-globals.preview_win_id = globals.DEFAULT_PREVIOUS_WIN_ID
+local _DEFAULT_PREVIOUS_WIN_ID = -1
 ---@type number
-globals.action_counter = globals.DEFAULT_ACTION_COUNTER
+local _DEFAULT_ACTION_COUNTER = 0
+---@type number
+local _preview_win_id = _DEFAULT_PREVIOUS_WIN_ID
+---@type number
+local _action_counter = _DEFAULT_ACTION_COUNTER
 ---@type bhop.Prediction
-globals.pred = vim.fn.deepcopy(bhop_pred.default_prediction)
+local _pred = vim.fn.deepcopy(bhop_pred.default_prediction) -- TODO: rename to _prediction to keep naming consistancy with the whole project
 
 local M = {}
 -- The default config, gets overriden with user config options as needed.
@@ -34,13 +39,13 @@ M.config = {
 }
 
 local function close_preview_win()
-    if globals.preview_win_id < 0 then
+    if _preview_win_id < 0 then
         return
     end
 
-    vim.api.nvim_win_close(globals.preview_win_id, false)
-    globals.action_counter = globals.DEFAULT_ACTION_COUNTER
-    globals.preview_win_id = globals.DEFAULT_PREVIOUS_WIN_ID
+    vim.api.nvim_win_close(_preview_win_id, false)
+    _action_counter = _DEFAULT_ACTION_COUNTER
+    _preview_win_id = _DEFAULT_PREVIOUS_WIN_ID
 end
 
 ---Opens preview window and returns the window's ID.
@@ -83,7 +88,7 @@ local function open_preview_win(prediction, max_prev_width) --luacheck: no unuse
 
     local buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(buf, 0, 1, false, { pred_line_content })
-    local namespace = vim.api.nvim_create_namespace("test") -- TODO: check if removing namespace creation helps.
+    local namespace = vim.api.nvim_create_namespace("test") -- TODO: check if namespace creation is necessary.
     local byte_col = vim.str_byteindex(pred_line_content, vim.fn.min {prediction.column - 1, half_preview_win_width})
     ---@diagnostic disable-next-line: param-type-mismatch
     vim.api.nvim_buf_add_highlight(buf, namespace, "Cursor", 0, byte_col, byte_col + 1)
@@ -100,11 +105,31 @@ local function open_preview_win(prediction, max_prev_width) --luacheck: no unuse
     return id
 end
 
+
+---Returns the lastest n elements in a list.
+---@param list table
+---@param n number
+---@return table
+local function latest_n(list, n)
+    local list_latest_n = {}
+    for edit_indx = #list - n, #list do
+        table.insert(list_latest_n, list[edit_indx])
+    end
+    return list_latest_n
+end
+
 ---Empty stub for hop function
 function M.hop() end
 
 --- Initializes all the autocommands and hop function.
 local function init()
+    -- Functions initialization
+    function M.hop()
+        bhop_pred.hop(_pred)
+        close_preview_win()
+    end
+
+    --- Autocommands initialization
     vim.api.nvim_create_autocmd({ "ModeChanged" }, {
         group = vim.api.nvim_create_augroup("PredictCursor", { clear = true }),
         pattern = "i:n",
@@ -113,18 +138,20 @@ local function init()
             if current_win_config.relative ~= "" then
                 return
             end
-            bhop_pred.predict(bhop_adapter, M.config, function(prediction)
-                globals.pred.line = prediction.line
-                globals.pred.column = prediction.column
-                globals.pred.file = prediction.file
+            bhop_pred.predict(_bhop_adapter, M.config, function(prediction)
+                _pred.line = prediction.line
+                _pred.column = prediction.column
+                _pred.file = prediction.file
 
                 -- Makes sure to only display the preview mode when in normal mode
-                if vim.api.nvim_get_mode().mode == "n" then -- TODO: Refactor to early return
-                    if globals.preview_win_id ~= globals.DEFAULT_PREVIOUS_WIN_ID then
-                        close_preview_win()
-                    end
-                    globals.preview_win_id = open_preview_win(prediction, M.config.max_prev_width)
+                if vim.api.nvim_get_mode().mode ~= "n" then return end
+
+                -- Makes sure to only display the preview mode when in normal mode
+                if _preview_win_id ~= _DEFAULT_PREVIOUS_WIN_ID then
+                    close_preview_win()
                 end
+                _preview_win_id = open_preview_win(prediction, M.config.max_prev_width)
+                -- TODO: Add prediction and edit entry to the edit history file of the specific buffer(current open buffer)
             end)
         end,
     })
@@ -136,15 +163,15 @@ local function init()
         group = prev_win_augroup,
         pattern = "*",
         callback = function()
-            if globals.preview_win_id < 0 then
+            if _preview_win_id < 0 then
                 return
             end
-            if globals.action_counter < 1 then
+            if _action_counter < 1 then
                 vim.api.nvim_win_set_config(
-                    globals.preview_win_id,
+                    _preview_win_id,
                     { relative = "cursor", row = 1, col = 0 }
                 )
-                globals.action_counter = globals.action_counter + 1
+                _action_counter = _action_counter + 1
             else
                 close_preview_win()
             end
@@ -155,10 +182,42 @@ local function init()
         pattern = "*",
         callback = close_preview_win
     })
-    function M.hop()
-        bhop_pred.hop(globals.pred)
-        close_preview_win()
-    end
+    vim.api.nvim_create_autocmd("BufEnter", {
+        group = vim.api.nvim_create_augroup("AddUndolistEntry", {clear = true}),
+        pattern = "*",
+        callback = function()
+            local buffer_name = vim.api.nvim_buf_get_name(0)
+            local valid_file_name = buffer_name:match("^.+/([%w_-]+)%.([%w]+)$")
+            if valid_file_name == nil or _editlists[buffer_name] ~= nil then
+                return
+            end
+
+            local edit_dir_path = vim.fn.stdpath("data") .. "/bunnyhop/edit_predictions/"
+            vim.fn.mkdir(edit_dir_path, "p")
+            local edit_file_path = edit_dir_path .. buffer_name:sub(2):gsub("/", "|") .. ".json"
+            local file_exists = vim.fn.filereadable(edit_file_path) == 1
+            if file_exists then
+                local file = io.open(edit_file_path, "r")
+                if file == nil then
+                    bhop_log.notify("Couldn't open file " .. edit_file_path .. " in read mode", vim.log.levels.DEBUG)
+                    return
+                end
+                local json_content = vim.json.decode(file:read("*a"), {object=true, array=true})
+                file:close()
+                _editlists[buffer_name] = latest_n(json_content, 40)
+            else
+                local file = io.open(edit_file_path, "w")
+                if file == nil then
+                    bhop_log.notify("Couldn't open file " .. edit_file_path .. " in write mode", vim.log.levels.DEBUG)
+                    return
+                end
+                local editlist = bhop_context.build_editlist()
+                file:write(vim.json.encode(editlist))
+                file:close()
+                _editlists[buffer_name] = latest_n(editlist, 40)
+            end
+        end
+    })
 end
 
 ---Setup function
@@ -169,15 +228,14 @@ function M.setup(opts)
         M.config[opt_key] = opt_val
     end
 
-    bhop_adapter = require("bunnyhop.adapters." .. M.config.adapter)
-    bhop_adapter.process_api_key(
+    _bhop_adapter = require("bunnyhop.adapters." .. M.config.adapter)
+    _bhop_adapter.process_api_key(
         M.config.api_key,
         function(api_key)
             M.config.api_key = api_key
         end
     )
     local config_ok = M.config.api_key ~= nil
-    -- TODO: Alert user that the config was setup incorrectly and bunnyhop was not initialized.
     if config_ok then
         init()
     else

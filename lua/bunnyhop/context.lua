@@ -1,5 +1,88 @@
 local bhop_log = require("bunnyhop.log")
+
+local function traverse_editlist(entries, n_latest)
+    local editlist = {}
+    -- create diffs for each entry in our undotree
+    local stop = 1
+    if n_latest ~= nil then
+        stop = #entries - (n_latest - 1)
+    end
+    for i = #entries, stop, -1 do
+        -- grab the buffer as it is after this iteration's undo state
+        local success = pcall(function()
+            vim.cmd("silent undo " .. entries[i].seq)
+        end)
+        if not success then
+            vim.notify_once(
+                "Encountered a bad state in nvim's native undolist for buffer "
+                    .. vim.api.nvim_buf_get_name(0)
+                    .. ", showing partial results.",
+                vim.log.levels.ERROR
+            )
+            return editlist
+        end
+
+        local buffer_after_lines = vim.api.nvim_buf_get_lines(0, 0, -1, false) or {}
+        local buffer_after = table.concat(buffer_after_lines, "\n")
+
+        -- grab the buffer as it is after this undo state's parent
+        success = pcall(function()
+            vim.cmd("silent undo")
+        end)
+        if not success then
+            vim.notify_once(
+                "Encountered a bad state in nvim's native undolist for buffer "
+                    .. vim.api.nvim_buf_get_name(0)
+                    .. ", showing partial results.",
+                vim.log.levels.ERROR
+            )
+            return editlist
+        end
+        local buffer_before_lines = vim.api.nvim_buf_get_lines(0, 0, -1, false) or {}
+        local buffer_before = table.concat(buffer_before_lines, "\n")
+
+        -- build diff header so that delta can go ahead and syntax highlight
+        local filename = vim.fn.expand("%")
+        local header = filename .. "\n--- " .. filename .. "\n+++ " .. filename .. "\n"
+
+        ---@type string
+        ---@diagnostic disable-next-line: assign-type-mismatch
+        local diff = vim.diff(buffer_before, buffer_after)
+
+        -- extract edited line number
+        local line_num_match = diff:match("@@ %-%d+")
+        ---@type number?
+        local line_num = 1
+        if line_num_match ~= nil then
+            line_num = tonumber(line_num_match:sub(5))
+        end
+
+        -- use the data we just created to feed into our finder later
+        table.insert(editlist, {
+            seq = entries[i].seq, -- save state number, used in display and to restore
+            time = entries[i].time, -- save state time, used in display
+            diff = header .. diff, -- the proper diff, used for preview
+            bufnr = vim.api.nvim_get_current_buf(), -- for which buffer this telescope was invoked, used to restore
+            line_num = line_num, -- starting line number of the diff
+            line_num_prediction = -1 -- TODO: this doesn't show up in undolist
+        })
+    end
+    return editlist
+end
+
 local M = {}
+
+function M.build_editlist(n_latest)
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    local ut = vim.fn.undotree()
+    local editlist = traverse_editlist(ut.entries, n_latest)
+
+    -- BUG: `gi` (last insert location) is being killed by our method, we should save that as well
+    vim.cmd("silent undo " .. ut.seq_cur)
+    vim.api.nvim_win_set_cursor(0, cursor)
+
+    return editlist
+end
 
 ---Creates prompt
 ---@return string
@@ -14,7 +97,10 @@ function M.create_prompt()
 
     for _, jump_row in pairs(jumplist) do
         local buf_num = jump_row["bufnr"]
-        if vim.fn.bufexists(buf_num) == 0 or vim.api.nvim_buf_is_valid(buf_num) == false then
+        if
+            vim.fn.bufexists(buf_num) == 0
+            or vim.api.nvim_buf_is_valid(buf_num) == false
+        then
             goto continue
         end
         local buf_name = vim.api.nvim_buf_get_name(buf_num)

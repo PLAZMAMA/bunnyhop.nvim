@@ -12,3 +12,11 @@
 ---@field line number
 ---@field column number
 ---@field file string
+
+---Entry of the undo history(no branching, only root path of the tree)
+---@class bhop.UndoEntry
+---@field bufnr number
+---@field diff number
+---@field line_num number
+---@field seq number
+---@field time number

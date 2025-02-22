@@ -1,11 +1,11 @@
 local bhop_log = require("bunnyhop.log")
 local M = {}
 
----@type string|nil
+---@type string?
 local _oauth_token
----@type number|nil
+---@type number?
 local _expires_at
----@type string|nil
+---@type string?
 local _api_key
 
 
@@ -36,7 +36,7 @@ end
 --- The function first attempts to load the token from the environment variables,
 --- specifically for GitHub Codespaces. If not found, it then attempts to load
 --- the token from configuration files located in the user's configuration path.
----@return string|nil
+---@return string?
 local function get_github_token()
     if _oauth_token then
         return _oauth_token
@@ -117,7 +117,7 @@ end
 ---Processes the given api_key for the Hugging Face provider.
 ---If an error occurs, the function returns nil and if it was successful, it returns the api_key.
 ---@param api_key string
----@param callback fun(api_key: string | nil): nil Function that gets called after the request is made.
+---@param callback fun(api_key: string?): nil Function that gets called after the request is made.
 ---@return nil
 function M.process_api_key(api_key, callback) --luacheck: no unused args
     _oauth_token = get_github_token()

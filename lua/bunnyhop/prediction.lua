@@ -32,7 +32,7 @@ function M.predict(adapter, config, callback)
             file = M.default_prediction.file,
         }
         if success == true then
-            if vim.fn.filereadable(pred_str[3]) ~= 0 then
+            if vim.fn.filereadable(pred_str[3]) == 1 then
                 prediction.file = pred_str[3]
             end
             local pred_buf_num = vim.fn.bufadd(prediction.file)
@@ -40,7 +40,7 @@ function M.predict(adapter, config, callback)
 
             if type(pred_str[1]) == "number" then
                 prediction.line =
-                    clip_number(prediction.line, 1, vim.api.nvim_buf_line_count(pred_buf_num))
+                    clip_number(pred_str[2], 1, vim.api.nvim_buf_line_count(pred_buf_num))
             end
 
             if type(pred_str[2]) == "number" then
