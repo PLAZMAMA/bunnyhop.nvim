@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/PLAZMAMA/bunnyhop.nvim/compare/v0.7.0...v0.7.1) (2025-03-08)
+
+
+### Bug Fixes
+
+* wrap latest_edit in a list when passing to append ([f477eac](https://github.com/PLAZMAMA/bunnyhop.nvim/commit/f477eac4b86b435a237dc56a9aa8baf72ae4ec09))
+
 ## [0.7.0](https://github.com/PLAZMAMA/bunnyhop.nvim/compare/v0.6.0...v0.7.0) (2025-03-03)
 
 
