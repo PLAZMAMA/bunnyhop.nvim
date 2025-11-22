@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.8.0](https://github.com/PLAZMAMA/bunnyhop.nvim/compare/v0.7.0...v0.8.0) (2025-11-22)
+
+
+### Features
+
+* add data collection toggle option ([c7033ca](https://github.com/PLAZMAMA/bunnyhop.nvim/commit/c7033cad7141fa0ecaad5b503d957c2bdab0b2a1))
+* collect prompt for future debugging and (potentially) model training ([37a6d3d](https://github.com/PLAZMAMA/bunnyhop.nvim/commit/37a6d3d09526244b062eb2b480499619f686b315))
+* handle data extraction from prompt more robustly ([62f5d1c](https://github.com/PLAZMAMA/bunnyhop.nvim/commit/62f5d1cd3d5574867906caa427d4034494b42259))
+
+
+### Bug Fixes
+
+* add model key value pair ([3b41783](https://github.com/PLAZMAMA/bunnyhop.nvim/commit/3b41783b50658013292716030a03f33e3cfdd8db))
+* fix json prediction assignment code ([6042ce0](https://github.com/PLAZMAMA/bunnyhop.nvim/commit/6042ce099f3fc6d32ae13f0b9ed72f5f21da4297))
+* wrap latest_edit in a list when passing to append ([f477eac](https://github.com/PLAZMAMA/bunnyhop.nvim/commit/f477eac4b86b435a237dc56a9aa8baf72ae4ec09))
+
 ## [0.7.0](https://github.com/PLAZMAMA/bunnyhop.nvim/compare/v0.6.0...v0.7.0) (2025-03-03)
 
 
