@@ -128,7 +128,7 @@ See the following guide to a variable to the PATH: [add to PATH][add-env-vars-wi
 
 
 ## Acknowledgments
-- Thank you [Oli Morris](https://github.com/olimorris) for encoraging me to make to plugin.
+- Thank you [Oli Morris](https://github.com/olimorris) for encoraging me to make this plugin.
 - [Cursor](https://github.com/getcursor/cursor) for the inspiration for this plugin.
 
 [rockspec-format]: https://github.com/luarocks/luarocks/wiki/Rockspec-format
